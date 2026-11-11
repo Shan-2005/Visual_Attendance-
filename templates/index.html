@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VisionAttend AI - Classroom Attendance & Security Monitoring</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=v3_clean">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="official-white-theme">
+    <!-- Top Alert Notification Bar for Intruders -->
+    <div id="unauthorizedAlertBanner" class="alert-banner hidden">
+        <div class="alert-content">
+            <i class="fa-solid fa-triangle-exclamation pulse-icon"></i>
+            <div>
+                <strong>SECURITY ALERT:</strong>
+                <span id="alertBannerText">Unauthorized / Unknown Person detected in camera field!</span>
+            </div>
+        </div>
+        <button id="closeAlertBtn" class="alert-close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="app-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-id-card-clip"></i>
+                    <span class="live-dot"></span>
+                </div>
+                <div class="brand-text">
+                    <h2>VisionAttend<span> AI</span></h2>
+                    <p>Institutional Attendance & Security</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="tab-monitor" id="navMonitor">
+                    <i class="fa-solid fa-video"></i>
+                    <span>Live Monitoring</span>
+                    <span class="pill-badge pulse-green">LIVE</span>
+                </button>
+                <button class="nav-item" data-tab="tab-dataset" id="navDataset">
+                    <i class="fa-solid fa-camera-rotate"></i>
+                    <span>Dataset Creator</span>
+                    <span class="count-badge" id="sidebarSampleCount">0</span>
+                </button>
+                <button class="nav-item" data-tab="tab-model" id="navModel">
+                    <i class="fa-solid fa-brain"></i>
+                    <span>Model & Gallery</span>
+                </button>
+                <button class="nav-item" data-tab="tab-records" id="navRecords">
+                    <i class="fa-solid fa-clipboard-user"></i>
+                    <span>Attendance Logs</span>
+                </button>
+                <a href="/report" target="_blank" class="nav-item" style="text-decoration: none;" title="Open official formatted report to Print / Save as PDF">
+                    <i class="fa-solid fa-file-pdf" style="color: #DC2626;"></i>
+                    <span>Lab Report (PDF)</span>
+                    <span class="pill-badge" style="background:#EFF6FF; color:#1D4ED8; border:1px solid #BFDBFE;">SRM</span>
+                </a>
+            </nav>
+
+            <div class="model-status-card">
+                <div class="model-header">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>AI Engine Status</span>
+                </div>
+                <div class="model-badge" id="aiStatusBadge">
+                    <span class="status-circle green"></span>
+                    <span id="aiStatusText">Ready / Trained</span>
+                </div>
+                <div class="model-meta">
+                    <div class="meta-row">
+                        <span>Accuracy</span>
+                        <strong id="aiAccuracyVal">--%</strong>
+                    </div>
+                    <div class="meta-row">
+                        <span>Classes</span>
+                        <strong id="aiClassesVal">--</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="time-display">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="currentTime">--:--:--</span>
+                </div>
+                <div class="date-display" id="currentDate">--</div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Top App Bar -->
+            <header class="topbar">
+                <div class="topbar-title">
+                    <h1 id="pageTitle">Classroom Live Attendance Monitor</h1>
+                    <p class="subtitle">AIoT Computer Vision • Automated Face Attendance & Perimeter Intruder Detection</p>
+                </div>
+
+                <div class="topbar-actions">
+                    <div class="header-stat-pill">
+                        <i class="fa-solid fa-user-check text-success"></i>
+                        <span>Present:</span>
+                        <strong id="headerPresentCount">0</strong>
+                        <span class="pill-divider">/</span>
+                        <span id="headerTotalCount">0</span>
+                    </div>
+                    <button class="btn btn-outline btn-sm" id="refreshStatsBtn" title="Sync live attendance statistics">
+                        <i class="fa-solid fa-arrows-rotate"></i>
+                        <span>Sync</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- TAB 1: Live Monitoring -->
+            <section class="tab-pane active" id="tab-monitor">
+                <div class="monitor-grid">
+                    <!-- Left: Camera Video Feed -->
+                    <div class="video-container-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-camera"></i>
+                                <span>Classroom Vision Stream</span>
+                            </div>
+                            <div class="feed-controls">
+                                <button class="btn btn-sm btn-primary" id="uploadTestImageBtn" title="Test inference on an uploaded photo instead of webcam">
+                                    <i class="fa-solid fa-file-image"></i>
+                                    <span>Upload Photo to Test</span>
+                                </button>
+                                <input type="file" id="testImageFileInput" accept="image/*" style="display:none">
+                                <button class="btn btn-sm btn-outline" id="flipCameraBtn" title="Toggle camera mirroring">
+                                    <i class="fa-solid fa-arrows-left-right"></i>
+                                    <span>Flip View</span>
+                                </button>
+                                <button class="btn btn-sm btn-outline" id="toggleWebcamBtn">
+                                    <i class="fa-solid fa-power-off"></i>
+                                    <span id="webcamBtnText">Stop Camera</span>
+                                </button>
+                                <span class="badge badge-success" id="streamFpsBadge">30 FPS</span>
+                            </div>
+                        </div>
+
+                        <div class="camera-viewport" id="cameraViewport">
+                            <video id="webcamVideo" autoplay playsinline muted></video>
+                            <canvas id="overlayCanvas"></canvas>
+                            <div class="camera-placeholder" id="cameraPlaceholder" style="display: none;">
+                                <i class="fa-solid fa-video-slash"></i>
+                                <p>Webcam is currently disabled or connecting...</p>
+                                <button class="btn btn-primary btn-sm" id="retryCameraBtn">Start Camera</button>
+                            </div>
+                            <div class="scanner-laser" id="scannerLaser"></div>
+                        </div>
+
+                        <div class="viewport-footer">
+                            <div class="status-indicator">
+                                <span class="status-dot green"></span>
+                                <span id="monitorStatusText">Analyzing classroom feed for registered faces...</span>
+                            </div>
+                            <div class="legend">
+                                <span class="legend-item"><span class="box-dot green"></span> Class 1: Authorized</span>
+                                <span class="legend-item"><span class="box-dot red"></span> Class 2: Unauthorized</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Live Real-time Activity Feed -->
+                    <div class="activity-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-bolt"></i>
+                                <span>Real-Time Detections</span>
+                            </div>
+                            <span class="badge badge-neutral" id="liveDetectCount">0 Detected</span>
+                        </div>
+
+                        <div class="detected-faces-box" id="detectedFacesList">
+                            <div class="empty-state">
+                                <i class="fa-solid fa-face-smile"></i>
+                                <p>Position face in front of the camera to detect attendance</p>
+                            </div>
+                        </div>
+
+                        <div class="card-header" style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.8rem;">
+                            <div class="card-title">
+                                <i class="fa-solid fa-calendar-check"></i>
+                                <span>Recent Attendance Marks</span>
+                            </div>
+                        </div>
+
+                        <div class="recent-marks-list" id="recentMarksList">
+                            <!-- Populated dynamically -->
+                            <div class="empty-state small">No attendance marked yet today.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: Camera-Based Dataset Creation -->
+            <section class="tab-pane" id="tab-dataset">
+                <div class="dataset-creator-grid">
+                    <!-- Left: Capture Camera -->
+                    <div class="capture-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-camera-retro"></i>
+                                <span>Dataset Capture Station</span>
+                            </div>
+                            <span class="badge badge-primary">High-Speed Dataset Creator</span>
+                        </div>
+
+                        <div class="capture-viewport-container">
+                            <div class="camera-viewport capture-viewport">
+                                <video id="datasetVideo" autoplay playsinline muted></video>
+                                <canvas id="datasetCanvas"></canvas>
+                                <div class="face-target-guide">
+                                    <div class="target-corner tl"></div>
+                                    <div class="target-corner tr"></div>
+                                    <div class="target-corner bl"></div>
+                                    <div class="target-corner br"></div>
+                                    <span class="target-hint">Align face inside guide</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="burst-progress-container" id="burstProgressBox" style="display: none;">
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" id="burstProgressBar"></div>
+                            </div>
+                            <span id="burstProgressText">Capturing frame 0 of 20...</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Dataset Labeling Form & Controls -->
+                    <div class="dataset-form-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-tags"></i>
+                                <span>Class & Label Assignment</span>
+                            </div>
+                        </div>
+
+                        <!-- Class Selection Mode -->
+                        <div class="class-selector">
+                            <label class="class-choice-btn active" id="btnClass1">
+                                <input type="radio" name="dataset_class" value="authorized" checked>
+                                <div class="class-info">
+                                    <span class="class-tag tag-auth">CLASS 1</span>
+                                    <h4>Authorized Student</h4>
+                                    <p>Registered student eligible for automated attendance</p>
+                                </div>
+                                <i class="fa-solid fa-circle-check check-icon"></i>
+                            </label>
+
+                            <label class="class-choice-btn" id="btnClass2">
+                                <input type="radio" name="dataset_class" value="unauthorized">
+                                <div class="class-info">
+                                    <span class="class-tag tag-unauth">CLASS 2</span>
+                                    <h4>Unauthorized / Unknown</h4>
+                                    <p>Intruder, unregistered stranger, or visitor sample</p>
+                                </div>
+                                <i class="fa-solid fa-circle-check check-icon"></i>
+                            </label>
+                        </div>
+
+                        <!-- Student Metadata (Shown only for Class 1) -->
+                        <div class="form-fields" id="authorizedStudentFields">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="studentIdInput">Student Roll / ID Number *</label>
+                                    <input type="text" id="studentIdInput" placeholder="e.g. CS202401" value="CS202401">
+                                </div>
+                                <div class="form-group">
+                                    <label for="studentNameInput">Student Full Name *</label>
+                                    <input type="text" id="studentNameInput" placeholder="e.g. Rohan Verma" value="Rohan Verma">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="studentDeptInput">Class / Department</label>
+                                <select id="studentDeptInput">
+                                    <option value="Computer Science & Eng">Computer Science & Eng</option>
+                                    <option value="Information Technology">Information Technology</option>
+                                    <option value="AI & Data Science">AI & Data Science</option>
+                                    <option value="Electronics & Comm">Electronics & Comm</option>
+                                    <option value="Mechanical Eng">Mechanical Eng</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Unauthorized Helper Info -->
+                        <div class="unauthorized-hint-box" id="unauthorizedHint" style="display: none;">
+                            <i class="fa-solid fa-shield-virus"></i>
+                            <div>
+                                <h5>Class 2: Negative/Unauthorized Samples</h5>
+                                <p>Capturing samples of unauthorized individuals teaches the AI model to distinguish authorized students from intruders or unregistered faces.</p>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="capture-actions">
+                            <button class="btn btn-secondary btn-lg" id="singleCaptureBtn">
+                                <i class="fa-solid fa-camera"></i>
+                                <span>Single Shot</span>
+                            </button>
+                            <button class="btn btn-primary btn-lg" id="burstCaptureBtn">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                <span>Burst Capture (20 Shots)</span>
+                            </button>
+                            <button class="btn btn-outline btn-lg" id="uploadDatasetBtn" type="button" title="Upload image files from your computer">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Upload Images</span>
+                            </button>
+                            <input type="file" id="datasetFileInput" accept="image/*" multiple style="display:none">
+                        </div>
+                        <div id="datasetUploadStatus" style="display:none; font-size:0.85rem; color:var(--text-muted); margin-top:0.4rem; padding:0.5rem; background:rgba(255,255,255,0.03); border-radius:6px;"></div>
+
+                        <!-- Teachable Machine Fast Export -->
+                        <div class="tm-export-row">
+                            <a href="/api/dataset/export-zip" class="btn btn-outline" download id="downloadTmZipBtn">
+                                <i class="fa-solid fa-file-zipper"></i>
+                                <span>Export Dataset (.ZIP) for Teachable Machine</span>
+                            </a>
+                            <a href="https://teachablemachine.withgoogle.com/train/image" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+                                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                <span>Open Google Teachable Machine</span>
+                            </a>
+                        </div>
+
+                        <div class="dataset-counter-summary">
+                            <div class="counter-item">
+                                <span>Class 1 Samples</span>
+                                <strong id="datasetClass1Count">0</strong>
+                            </div>
+                            <div class="counter-item">
+                                <span>Class 2 Samples</span>
+                                <strong id="datasetClass2Count">0</strong>
+                            </div>
+                            <div class="counter-item highlight">
+                                <span>Total Dataset</span>
+                                <strong id="datasetTotalCount">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: Model & Gallery -->
+            <section class="tab-pane" id="tab-model">
+                <div class="model-gallery-grid">
+                    <!-- Training Station -->
+                    <div class="train-station-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-brain"></i>
+                                <span>AI Model Training Station</span>
+                            </div>
+                            <span class="badge badge-primary">PCA + Support Vector Classifier</span>
+                        </div>
+
+                        <div class="train-dashboard">
+                            <div class="train-info-box">
+                                <div class="train-stat">
+                                    <span class="stat-title">Current Status</span>
+                                    <h4 id="modelStatusHeader">Ready</h4>
+                                </div>
+                                <div class="train-stat">
+                                    <span class="stat-title">Trained Accuracy</span>
+                                    <h4 id="modelAccuracyHeader">--%</h4>
+                                </div>
+                                <div class="train-stat">
+                                    <span class="stat-title">Training Samples</span>
+                                    <h4 id="modelSamplesHeader">0</h4>
+                                </div>
+                                <div class="train-stat">
+                                    <span class="stat-title">Last Trained</span>
+                                    <h4 id="modelLastTrainedHeader">Never</h4>
+                                </div>
+                            </div>
+
+                            <p class="train-desc">
+                                Train the computer vision model on your camera-captured dataset. The system extracts normalized facial feature representations using Principal Component Analysis (PCA) and fits a robust classifier to identify Authorized Students vs Unauthorized Persons with confidence scoring.
+                            </p>
+
+                            <div class="train-action-bar">
+                                <button class="btn btn-primary btn-lg" id="startTrainModelBtn">
+                                    <i class="fa-solid fa-play"></i>
+                                    <span>Train AI Model Now</span>
+                                </button>
+                                <button class="btn btn-outline" id="loadDemoDataBtn">
+                                    <i class="fa-solid fa-database"></i>
+                                    <span>Reload Demo Dataset</span>
+                                </button>
+                            </div>
+
+                            <div id="trainNotification" class="train-notify-box hidden"></div>
+                        </div>
+                    </div>
+
+                    <!-- Dataset Gallery -->
+                    <div class="gallery-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i class="fa-solid fa-images"></i>
+                                <span>Captured Face Gallery</span>
+                            </div>
+                            <div class="gallery-tabs">
+                                <button class="btn btn-sm btn-tab active" data-gallery="authorized">Class 1: Authorized</button>
+                                <button class="btn btn-sm btn-tab" data-gallery="unauthorized">Class 2: Unauthorized</button>
+                            </div>
+                        </div>
+
+                        <div class="gallery-grid" id="galleryContainer">
+                            <!-- Populated dynamically -->
+                            <div class="empty-state">Loading dataset gallery...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Teachable Machine Model Connector Card -->
+                <div class="train-station-card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-shapes"></i>
+                            <span>Google Teachable Machine Integration (FP-II Tool)</span>
+                        </div>
+                        <span class="badge badge-success" id="tmStatusBadge">Teachable Machine Ready</span>
+                    </div>
+
+                    <div class="tm-connector-body">
+                        <p class="train-desc">
+                            Connect your Google Teachable Machine trained model directly to this classroom attendance system. Once connected, your Teachable Machine neural network will classify webcam frames in real-time to authenticate Authorized Students (Class 1) and trigger security alarms for Unauthorized Persons (Class 2).
+                        </p>
+
+                        <div class="tm-input-group">
+                            <div class="tm-url-input-wrap">
+                                <i class="fa-solid fa-link"></i>
+                                <input type="url" id="tmModelUrlInput" placeholder="https://teachablemachine.withgoogle.com/models/your-model-id/" value="">
+                            </div>
+                            <button class="btn btn-primary" id="loadTmModelBtn">
+                                <i class="fa-solid fa-plug"></i>
+                                <span>Connect Model</span>
+                            </button>
+                            <button class="btn btn-outline" id="loadDemoTmModelBtn">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                                <span>Load Sample TM Model</span>
+                            </button>
+                        </div>
+
+                        <!-- TM Prediction Confidence Bars -->
+                        <div class="tm-live-bars" id="tmLiveBars" style="display: none; margin-top: 1rem;">
+                            <div class="bar-header">
+                                <strong>Live Teachable Machine Prediction Stream:</strong>
+                            </div>
+                            <div class="class-prob-row">
+                                <div class="prob-label">
+                                    <span class="class-tag tag-auth">CLASS 1</span>
+                                    <span>Authorized Student</span>
+                                </div>
+                                <div class="prob-track">
+                                    <div class="prob-fill auth" id="tmProbClass1" style="width: 0%;"></div>
+                                </div>
+                                <span class="prob-val" id="tmProbClass1Val">0%</span>
+                            </div>
+                            <div class="class-prob-row">
+                                <div class="prob-label">
+                                    <span class="class-tag tag-unauth">CLASS 2</span>
+                                    <span>Unauthorized Person</span>
+                                </div>
+                                <div class="prob-track">
+                                    <div class="prob-fill unauth" id="tmProbClass2" style="width: 0%;"></div>
+                                </div>
+                                <span class="prob-val" id="tmProbClass2Val">0%</span>
+                            </div>
+                        </div>
+
+                        <!-- Lab Experiment 9 Quick Guide Accordion -->
+                        <div class="lab-guide-box" style="margin-top: 1.25rem;">
+                            <div class="lab-guide-header">
+                                <i class="fa-solid fa-book-open"></i>
+                                <h4>FP-II Experiment 9: Camera-Based Dataset Creation - Submission Guide</h4>
+                            </div>
+                            <div class="lab-steps-list">
+                                <div class="lab-step">
+                                    <span class="step-num">1</span>
+                                    <div><strong>Dataset Capture:</strong> Go to the <em>Dataset Creator</em> tab and capture 20-50 shots of <strong>Class 1 (Authorized Student)</strong> and <strong>Class 2 (Unauthorized Person)</strong> using your camera.</div>
+                                </div>
+                                <div class="lab-step">
+                                    <span class="step-num">2</span>
+                                    <div><strong>Teachable Machine Studio:</strong> Click <em>Open Google Teachable Machine</em> (Image Project, Standard model) and add Class 1 &amp; Class 2.</div>
+                                </div>
+                                <div class="lab-step">
+                                    <span class="step-num">3</span>
+                                    <div><strong>Model Training:</strong> Click <em>Train Model</em> on Teachable Machine.</div>
+                                </div>
+                                <div class="lab-step">
+                                    <span class="step-num">4</span>
+                                    <div><strong>Export &amp; Connect:</strong> Click <em>Export Model</em> &rarr; <em>Upload (shareable link)</em> &rarr; Paste your URL above and click <em>Connect Model</em>!</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: Attendance Records & Security Logs -->
+            <section class="tab-pane" id="tab-records">
+                <!-- Daily Attendance Executive Metrics -->
+                <div class="metrics-grid" style="margin-bottom: 1.25rem;">
+                    <div class="metric-card card-primary">
+                        <div class="metric-icon">
+                            <i class="fa-solid fa-users"></i>
+                        </div>
+                        <div class="metric-details">
+                            <span class="metric-label">Enrolled Students</span>
+                            <h3 class="metric-val" id="statTotalStudents">0</h3>
+                            <span class="metric-sub">Registered Class 1</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card card-success">
+                        <div class="metric-icon">
+                            <i class="fa-solid fa-user-check"></i>
+                        </div>
+                        <div class="metric-details">
+                            <span class="metric-label">Present Today</span>
+                            <h3 class="metric-val" id="statPresentToday">0</h3>
+                            <span class="metric-sub" id="statPresentRate">0% Turnout</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card card-warning">
+                        <div class="metric-icon">
+                            <i class="fa-solid fa-user-xmark"></i>
+                        </div>
+                        <div class="metric-details">
+                            <span class="metric-label">Absent Today</span>
+                            <h3 class="metric-val" id="statAbsentToday">0</h3>
+                            <span class="metric-sub">Unverified</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card card-primary">
+                        <div class="metric-icon">
+                            <i class="fa-solid fa-camera-retro"></i>
+                        </div>
+                        <div class="metric-details">
+                            <span class="metric-label">Dataset Archive</span>
+                            <h3 class="metric-val" id="statDatasetTotal">0</h3>
+                            <span class="metric-sub">Trained Samples</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="records-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i class="fa-solid fa-table-list"></i>
+                            <span>Classroom Attendance Register</span>
+                        </div>
+                        <div class="export-actions">
+                            <button class="btn btn-outline btn-sm" id="openQuickCaptureBtn" title="Enroll a new student">
+                                <i class="fa-solid fa-user-plus"></i>
+                                <span>Enroll Student</span>
+                            </button>
+                            <a href="/api/attendance/export/csv" class="btn btn-outline btn-sm" download>
+                                <i class="fa-solid fa-file-csv"></i>
+                                <span>Export CSV</span>
+                            </a>
+                            <a href="/api/attendance/export/excel" class="btn btn-primary btn-sm" download>
+                                <i class="fa-solid fa-file-excel"></i>
+                                <span>Export Excel</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Table Filters -->
+                    <div class="table-filters">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="recordSearchInput" placeholder="Search by student name or roll number...">
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterDateInput"><i class="fa-regular fa-calendar"></i> Date:</label>
+                            <input type="date" id="filterDateInput">
+                            <button class="btn btn-outline btn-sm" id="clearDateFilterBtn">All Dates</button>
+                        </div>
+                    </div>
+
+                    <!-- Attendance Table -->
+                    <div class="table-responsive">
+                        <table class="data-table" id="attendanceTable">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Roll / Student ID</th>
+                                    <th>Student Name</th>
+                                    <th>Date</th>
+                                    <th>Time Marked</th>
+                                    <th>Confidence</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendanceTableBody">
+                                <tr><td colspan="7" class="text-center">Loading attendance records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+    </div>
+
+    <!-- Quick Enroll Student Modal -->
+    <div class="modal-backdrop" id="enrollModal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-plus"></i> Quick Student Registration</h3>
+                <button class="modal-close" id="closeEnrollModalBtn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Student Roll / ID Number</label>
+                    <input type="text" id="modalStudentId" placeholder="e.g. CS202404">
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="modalStudentName" placeholder="e.g. Priya Sharma">
+                </div>
+                <div class="form-group">
+                    <label>Department / Stream</label>
+                    <input type="text" id="modalStudentDept" placeholder="e.g. Computer Science" value="Computer Science">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="cancelEnrollBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveEnrollBtn">Proceed to Capture Dataset</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TensorFlow.js and Google Teachable Machine Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script src="/static/js/app.js?v=v3_clean"></script>
+</body>
+</html>
